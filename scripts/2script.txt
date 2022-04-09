@@ -1,0 +1,168 @@
+# start --script 2script.py
+
+import logging
+import time
+from decimal import Decimal
+from statistics import mean
+from typing import List
+
+import requests
+
+import hummingbot.client.settings as settings
+from hummingbot.connector.exchange_base import ExchangeBase
+from hummingbot.connector.utils import split_hb_trading_pair
+from hummingbot.core.data_type.order_candidate import OrderCandidate
+from hummingbot.core.event.events import OrderFilledEvent, OrderType, TradeType
+from hummingbot.core.rate_oracle.rate_oracle import RateOracle
+from hummingbot.strategy.script_strategy_base import ScriptStrategyBase
+from hummingbot.core.utils.trading_pair_fetcher import TradingPairFetcher
+
+from hummingbot.strategy.market_trading_pair_tuple import MarketTradingPairTuple
+
+s_decimal_0 = Decimal(0)
+
+class Script2(ScriptStrategyBase):
+
+    # It is best to first use a paper trade exchange connector 
+    # while coding your strategy, once you are happy with it
+    # then switch to real one.
+
+    arbitrage_markets = ["gate_io_paper_trade", "binance_paper_trade"]
+
+    trading_pair_fetcher: TradingPairFetcher = TradingPairFetcher.get_instance()
+    if trading_pair_fetcher.ready:
+        trading_pairs_1 = trading_pair_fetcher.trading_pairs.get(arbitrage_markets[0], [])
+        trading_pairs_2 = trading_pair_fetcher.trading_pairs.get(arbitrage_markets[1], [])
+    trading_pairs_set = list(set(trading_pairs_1).intersection(trading_pairs_2))
+    trading_pairs_set = trading_pairs_set[100:170]
+    notify = False
+    prototype = True
+
+    if prototype:
+        arbitrage_markets = ["gate_io_paper_trade", "ascend_ex_paper_trade"]
+        if trading_pair_fetcher.ready:
+            trading_pairs_1 = trading_pair_fetcher.trading_pairs.get(arbitrage_markets[0], [])
+            trading_pairs_2 = trading_pair_fetcher.trading_pairs.get(arbitrage_markets[1], [])
+            trading_pairs_set = list(set(trading_pairs_1).intersection(trading_pairs_2))
+        trading_pairs_set = trading_pairs_set[0:80]
+        trading_pairs_set = ["STOS-USDT", "SMTY-USDT","ZIG-USDT","ASD-USDT","EOSBEAR-USDT"]
+
+    markets = {arbitrage_markets[0]: trading_pairs_set,
+			   arbitrage_markets[1]: trading_pairs_set
+    }
+    min_profitability = Decimal('0.007')
+
+    def on_tick(self):
+        # trading_pair_fetcher: TradingPairFetcher = TradingPairFetcher.get_instance()
+        # self.logger().info(f"trading_pairs_1 {len(self.trading_pairs_1)}")
+        # self.logger().info(f"trading_pairs_2 {len(self.trading_pairs_2)}")
+        # self.logger().info(f"trading_pairs_set {len(self.trading_pairs_set)}")
+        self.logger().info(f"trading_pairs_1 {self.trading_pairs_set}")
+
+
+        for pair in self.trading_pairs_set:
+            try:
+                market_1_bid = self.connectors[self.arbitrage_markets[0]].get_price(pair,False)
+                market_1_ask = self.connectors[self.arbitrage_markets[0]].get_price(pair,True)
+                market_2_bid = self.connectors[self.arbitrage_markets[1]].get_price(pair,False)
+                market_2_ask = self.connectors[self.arbitrage_markets[1]].get_price(pair,True)
+                # self.logger().info(f"{pair} - Bid: {market_1_bid}, Ask: {market_1_ask}")
+                profitability_buy_1_sell_2 = market_1_bid/market_2_ask - 1
+                profitability_buy_2_sell_1 = market_2_bid/market_1_ask - 1
+                
+                if profitability_buy_1_sell_2 > self.min_profitability:
+                    self.find_profitable_arbitrage_orders(self.min_profitability, pair,pair,)
+                if profitability_buy_2_sell_1 > self.min_profitability:
+                    self.notify_hb_app_with_timestamp(f"Pair{pair}: buy_2_sell_1: {profitability_buy_2_sell_1:.5f}")
+            except:
+                self.logger().info(f"{pair} has no bid or ask order book")
+    
+
+    def find_profitable_arbitrage_orders(self, min_profitability,
+                                                 buy_market_trading_pair_tuple,
+                                                 sell_market_trading_pair_tuple,
+                                                 buy_market_conversion_rate,
+                                                 sell_market_conversion_rate):
+        """
+        Iterates through sell and buy order books and returns a list of matched profitable sell and buy order
+        pairs with sizes.
+
+        If no profitable trades can be done between the buy and sell order books, then returns an empty list.
+
+        :param min_profitability: Minimum profit ratio
+        :param buy_market_trading_pair_tuple: trading pair for buy side
+        :param sell_market_trading_pair_tuple: trading pair for sell side
+        :param buy_market_conversion_rate: conversion rate for buy market price
+        :param sell_market_conversion_rate: conversion rate for sell market price
+        :return: ordered list of (bid_price:Decimal, ask_price:Decimal, amount:Decimal)
+        """
+
+        step_amount = s_decimal_0
+        bid_leftover_amount = s_decimal_0
+        ask_leftover_amount = s_decimal_0
+        current_bid = None
+        current_ask = None
+        current_bid_price_adjusted
+        current_ask_price_adjusted
+        sell_market_quote_asset = sell_market_trading_pair_tuple.quote_asset
+        buy_market_quote_asset = buy_market_trading_pair_tuple.quote_asset
+
+        profitable_orders = []
+        bid_it = sell_market_trading_pair_tuple.order_book_bid_entries()
+        ask_it = buy_market_trading_pair_tuple.order_book_ask_entries()
+
+        try:
+            while True:
+                if bid_leftover_amount == 0 and ask_leftover_amount == 0:
+                    # both current ask and bid orders are filled, advance to the next bid and ask order
+                    current_bid = next(bid_it)
+                    current_ask = next(ask_it)
+                    ask_leftover_amount = current_ask.amount
+                    bid_leftover_amount = current_bid.amount
+
+                elif bid_leftover_amount > 0 and ask_leftover_amount == 0:
+                    # current ask order filled completely, advance to the next ask order
+                    current_ask = next(ask_it)
+                    ask_leftover_amount = current_ask.amount
+
+                elif ask_leftover_amount > 0 and bid_leftover_amount == 0:
+                    # current bid order filled completely, advance to the next bid order
+                    current_bid = next(bid_it)
+                    bid_leftover_amount = current_bid.amount
+
+                elif bid_leftover_amount > 0 and ask_leftover_amount > 0:
+                    # current ask and bid orders are not completely filled, no need to advance iterators
+                    pass
+                else:
+                    # something went wrong if leftover amount is negative
+                    break
+
+                # adjust price based on the quote token rates
+                current_bid_price_adjusted = current_bid.price * sell_market_conversion_rate
+                current_ask_price_adjusted = current_ask.price * buy_market_conversion_rate
+                # arbitrage not possible
+                if current_bid_price_adjusted < current_ask_price_adjusted:
+                    break
+                # allow negative profitability for debugging
+                if min_profitability<0 and current_bid_price_adjusted/current_ask_price_adjusted < (1 + min_profitability):
+                    break
+
+                step_amount = min(bid_leftover_amount, ask_leftover_amount)
+
+                # skip cases where step_amount=0 for exchanges like binance that include orders with 0 amount
+                if step_amount == 0:
+                    continue
+
+                profitable_orders.append((current_bid_price_adjusted,
+                                        current_ask_price_adjusted,
+                                        current_bid.price,
+                                        current_ask.price,
+                                        step_amount))
+
+                ask_leftover_amount -= step_amount
+                bid_leftover_amount -= step_amount
+
+        except StopIteration:
+            pass
+
+        return profitable_orders

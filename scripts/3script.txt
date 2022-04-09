@@ -1,0 +1,65 @@
+# start --script 3script.py
+
+import logging
+import time
+from decimal import Decimal
+from statistics import mean
+from typing import List
+
+import requests
+
+import hummingbot.client.settings as settings
+from hummingbot.connector.exchange_base import ExchangeBase
+from hummingbot.connector.utils import split_hb_trading_pair
+from hummingbot.core.data_type.order_candidate import OrderCandidate
+from hummingbot.core.event.events import OrderFilledEvent, OrderType, TradeType
+from hummingbot.core.rate_oracle.rate_oracle import RateOracle
+from hummingbot.strategy.script_strategy_base import ScriptStrategyBase
+
+from hummingbot.core.utils.trading_pair_fetcher import TradingPairFetcher
+
+from hummingbot.strategy.market_trading_pair_tuple import MarketTradingPairTuple
+
+class Script3(ScriptStrategyBase):
+
+    # It is best to first use a paper trade exchange connector 
+    # while coding your strategy, once you are happy with it
+    # then switch to real one.
+    arbitrage_markets = ["gate_io_paper_trade", "ascend_ex_paper_trade"]
+    arbitrage_pairs = ["ETH-USDT"]
+    markets = {arbitrage_markets[0]: arbitrage_pairs,
+			   arbitrage_markets[1]: arbitrage_pairs
+    }
+    min_profitability = Decimal('0.005')
+
+    primary_market = arbitrage_markets[0]
+    secondary_market = arbitrage_markets[1]
+    raw_primary_trading_pair = arbitrage_pairs[0]
+    raw_secondary_trading_pair = arbitrage_pairs[0]
+
+    primary_trading_pair = raw_primary_trading_pair
+    secondary_trading_pair = raw_secondary_trading_pair
+    primary_assets = self._initialize_market_assets(primary_market, [primary_trading_pair])[0]
+    secondary_assets = self._initialize_market_assets(secondary_market,[secondary_trading_pair])[0]
+
+    market_names= [(primary_market, [primary_trading_pair]), (secondary_market, [secondary_trading_pair])]
+    # self._initialize_markets(market_names)
+
+    primary_data = [self.markets[primary_market], primary_trading_pair] + list(primary_assets)
+    secondary_data = [self.markets[secondary_market], secondary_trading_pair] + list(secondary_assets)
+    self.market_trading_pair_tuples = [MarketTradingPairTuple(*primary_data), MarketTradingPairTuple(*secondary_data)]
+
+    def _initialize_market_assets(market_name: str, trading_pairs: List[str]):
+        market_trading_pairs = [(trading_pair.split('-')) for trading_pair in trading_pairs]
+        return market_trading_pairs
+
+    def on_tick(self):
+        market_1 = self.connectors[self.arbitrage_markets[0]]
+        self.logger().info(f"{market_1}")
+        self.logger().info(f"{type(self.arbitrage_markets[0])}")
+
+
+
+    # def _initialize_market_assets(market_name: str, trading_pairs: List[str]) -> List[Tuple[str, str]]:
+    #     market_trading_pairs: List[Tuple[str, str]] = [(trading_pair.split('-')) for trading_pair in trading_pairs]
+    #     return market_trading_pairs
