@@ -1,12 +1,12 @@
-![Hummingbot](https://i.ibb.co/X5zNkKw/blacklogo-with-text.png)
-
-----
-
+## Arbitrage Bot
 
 Arbitrage Bot is an extension of Hummingbot. Hummingbot is an open-source project that integrates cryptocurrency trading on both **centralized exchanges** and **decentralized protocols**. It allows users to run a client that executes customized, automated trading strategies for cryptocurrencies.
 
-Arbitrage Bot scans the markets for price differences between exchanges where tokens should be of the same price. We scan the market for up to 100 tokens and 4 markets concurrently. 
+Arbitrage Bot scans the markets for price differences between exchanges where tokens should be of the same price. We scan the market for up to 100 tokens and 4 markets concurrently.
 
+----
+
+![Hummingbot](https://i.ibb.co/X5zNkKw/blacklogo-with-text.png)
 
 ## Connector status
 
